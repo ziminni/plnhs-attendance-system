@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "814044585268",
+    "project_id": "early-qrscanner",
+    "storage_bucket": "early-qrscanner.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:814044585268:android:dd6550bfd59dd9d502d961",
+        "android_client_info": {
+          "package_name": "com.example.early_v1_0"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKvvjq3xxYPbokSGdsAKZN-WDEdx6rZ48"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
