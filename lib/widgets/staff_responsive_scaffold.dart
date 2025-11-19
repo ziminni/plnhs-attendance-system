@@ -1,116 +1,111 @@
 import 'package:early_v1_0/pages/home_page.dart';
 import 'package:early_v1_0/pages/scanner_page.dart';
 import 'package:early_v1_0/pages/settings_page.dart';
+import 'package:early_v1_0/widgets/navbars/desktop_navigation.dart';
+import 'package:early_v1_0/widgets/navbars/mobile_navigation.dart';
 import 'package:early_v1_0/widgets/responsive_widget.dart';
+import 'package:early_v1_0/widgets/navbars/tablet_navigation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class StaffResponsiveScaffold extends StatefulWidget {
   const StaffResponsiveScaffold({super.key});
 
   @override
-  State<StaffResponsiveScaffold> createState() =>
-      _StaffResponsiveScaffoldState();
+  State<StaffResponsiveScaffold> createState() => _StaffResponsiveScaffoldState();
 }
 
-class _StaffResponsiveScaffoldState extends State<StaffResponsiveScaffold> {
+class _StaffResponsiveScaffoldState extends State<StaffResponsiveScaffold>
+    with TickerProviderStateMixin<StaffResponsiveScaffold> {
   int _selectedIndex = 0;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
-  final List<Widget> _pages = [HomePage(), QRViewExample(), SettingsPage()];
+  final List<Widget> _pages = [const HomePage(), const QRViewExample(), const SettingsPage()];
+
+  // Blue theme colors
+  final Color primaryBlue = const Color(0xFF1E88E5);
+  final Color lightBlue = const Color(0xFF64B5F6);
+  final Color darkBlue = const Color(0xFF0D47A1);
+  final Color accentBlue = const Color(0xFF42A5F5);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsFlutterBinding.ensureInitialized();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    _animationController.forward();
+
+    // Set immersive mode for mobile and tablet after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return; // Ensure widget is still mounted
+      final screenWidth = MediaQuery.of(context).size.width;
+      SystemChrome.setEnabledSystemUIMode(
+        screenWidth < 1200 ? SystemUiMode.immersive : SystemUiMode.edgeToEdge,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  void _onItemTapped(int index) {
+    if (_selectedIndex != index) {
+      _animationController.reset();
+      setState(() {
+        _selectedIndex = index;
+      });
+      _animationController.forward();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return ResponsiveWidget(
-      mobile: _buildMobile(),
-      tablet: _buildTablet(),
-      desktop: _buildDesktop(),
-    );
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  Widget _buildMobile() {
-    return Scaffold(
-      appBar: AppBar(title: Text("E.A.R.L.Y")),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: [
-          BottomNavigationBarItem(label: "Home", icon: Icon(Icons.home)),
-          BottomNavigationBarItem(
-            label: "Scanner",
-            icon: Icon(Icons.camera_alt_outlined),
-          ),
-          BottomNavigationBarItem(
-            label: "Settings",
-            icon: Icon(Icons.settings),
-          ),
-        ],
+      mobile: MobileNavigation(
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
+        pages: _pages,
+        fadeAnimation: _fadeAnimation,
+        primaryBlue: primaryBlue,
+        lightBlue: lightBlue,
+        darkBlue: darkBlue,
+        accentBlue: accentBlue,
+      ),
+      tablet: TabletNavigation(
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
+        pages: _pages,
+        fadeAnimation: _fadeAnimation,
+        primaryBlue: primaryBlue,
+        lightBlue: lightBlue,
+        darkBlue: darkBlue,
+        accentBlue: accentBlue,
+      ),
+      desktop: DesktopNavigation(
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
+        pages: _pages,
+        fadeAnimation: _fadeAnimation,
+        primaryBlue: primaryBlue,
+        lightBlue: lightBlue,
+        darkBlue: darkBlue,
+        accentBlue: accentBlue,
       ),
     );
-  }
-
-  Widget _buildTablet() {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("This is Tablet"),
-      ),
-      body: Row(
-        children: [
-          NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: _onItemTapped,
-            labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(icon: Icon(Icons.home), label: Text("Home")),
-              NavigationRailDestination(icon: Icon(Icons.camera_alt_outlined), label: Text("Scanner")),
-              NavigationRailDestination(icon: Icon(Icons.settings), label: Text("Settings")),
-          ]),
-          VerticalDivider(width: 1,),
-          Expanded(child: _pages[_selectedIndex])
-        ],
-      )
-    );
-  }
-
-  Widget _buildDesktop() {
-    return Scaffold(
-      appBar: AppBar(title: Text("Responsive App")),
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            DrawerHeader(child: Text("Menu")),
-            ListTile(
-              leading: Icon(Icons.home),
-              title: Text("Home"),
-              selected: _selectedIndex == 0,
-              onTap: () => _onItemTappedAndClose(0),
-            ),
-            ListTile(
-              leading: Icon(Icons.camera_alt_outlined),
-              title: Text("Scanner"),
-              selected: _selectedIndex == 1,
-              onTap: () => _onItemTappedAndClose(1),
-            ),
-            ListTile(
-              leading: Icon(Icons.settings),
-              title: Text("Settings"),
-              selected: _selectedIndex == 1,
-              onTap: () => _onItemTappedAndClose(1),
-            ),
-          ],
-        ),
-      ),
-      body: _pages[_selectedIndex],
-    );
-  }
-
-  void _onItemTappedAndClose(int index) {
-    Navigator.of(context).pop(); // close drawer
-    _onItemTapped(index);
   }
 }

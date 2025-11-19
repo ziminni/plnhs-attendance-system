@@ -60,7 +60,7 @@ class FirebaseService {
           .get();
       print('Fallback query for lrn=$cleanedLrn, Docs found: ${fallbackQuery.docs.length}');
       if (fallbackQuery.docs.isNotEmpty) {
-        var docData = fallbackQuery.docs.first.data() as Map<String, dynamic>;
+        var docData = fallbackQuery.docs.first.data();
         if (docData.containsKey('lrn')) {
           docData['lrn'] = docData['lrn'].toString().trim().replaceAll(RegExp(r'\s+'), '');
         }
@@ -135,7 +135,7 @@ class FirebaseService {
       print('Successfully logged attendance for student LRN: $cleanedLrn, Type: $attendanceType');
     } catch (e) {
       print('Error logging student attendance: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -199,7 +199,7 @@ class FirebaseService {
       print('Successfully logged attendance for teacher LRN: $cleanedLrn, Type: $attendanceType');
     } catch (e) {
       print('Error logging teacher attendance: $e');
-      throw e;
+      rethrow;
     }
   }
 
