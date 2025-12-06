@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'teachers_logs.dart';
@@ -10,6 +9,7 @@ import 'student_management.dart';
 import 'archive_logs.dart';
 
 import '/services/firebase_service.dart';
+import '/models/models.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -20,14 +20,14 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
-  
+
   // Dashboard statistics
   int _studentsInsideCampus = 0;
   int _studentsEnteredToday = 0;
   int _studentsLeftToday = 0;
   int _lateStudentsToday = 0;
   bool _isLoading = true;
-  
+
   // List of widget options for the dashboard
   final List<Widget> _widgetOptions = [
     const DashboardHome(),
@@ -49,7 +49,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     super.dispose();
   }
 
-
   Future<void> _fetchDashboardData() async {
     try {
       setState(() {
@@ -57,72 +56,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
       });
 
       final todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      
-      // Get all student logs for today
+
+      // Get all student logs for today - now returns List<StudentLog>
       final logs = await FirebaseService.getStudentLogsByDate(todayDate);
-      
-      // Calculate metrics
+
+      // Calculate metrics using StudentLog model
       int insideCampus = 0;
       int enteredToday = 0;
       int leftToday = 0;
       int lateStudents = 0;
-      
-      // Official start time for school (7:30 AM)
-      const officialStartTime = TimeOfDay(hour: 7, minute: 30);
-      final now = DateTime.now();
-      final officialDateTime = DateTime(
-        now.year, 
-        now.month, 
-        now.day, 
-        officialStartTime.hour, 
-        officialStartTime.minute
-      );
 
       for (var log in logs) {
-        final morningIn = log['morningIn'] as Timestamp?;
-        final morningOut = log['morningOut'] as Timestamp?;
-        final afternoonIn = log['afternoonIn'] as Timestamp?;
-        final afternoonOut = log['afternoonOut'] as Timestamp?;
-
-        // Check if student is inside campus (scanned IN but not OUT)
-        bool isInside = false;
-        
-        // Morning session check
-        if (morningIn != null && morningOut == null) {
-          isInside = true;
-        }
-        
-        // Afternoon session check
-        if (afternoonIn != null && afternoonOut == null) {
-          isInside = true;
-        }
-        
-        // If student scanned out in morning and hasn't scanned in for afternoon
-        if (morningOut != null && afternoonIn == null) {
-          final currentTime = TimeOfDay.now();
-          if (currentTime.hour >= 12) {
-            isInside = false;
-          }
-        }
-        
-        if (isInside) {
+        // Use the model's built-in properties
+        if (log.isInsideCampus) {
           insideCampus++;
         }
 
         // Count total entries for today
-        if (morningIn != null) enteredToday++;
-        if (afternoonIn != null) enteredToday++;
+        if (log.morningIn != null) enteredToday++;
+        if (log.afternoonIn != null) enteredToday++;
 
         // Count total exits for today
-        if (morningOut != null) leftToday++;
-        if (afternoonOut != null) leftToday++;
+        if (log.morningOut != null) leftToday++;
+        if (log.afternoonOut != null) leftToday++;
 
-        // Check for late students (arrived after 7:30 AM)
-        if (morningIn != null) {
-          final arrivalTime = morningIn.toDate();
-          if (arrivalTime.isAfter(officialDateTime)) {
-            lateStudents++;
-          }
+        // Check for late students using the model's wasLate property
+        if (log.wasLate) {
+          lateStudents++;
         }
       }
 
@@ -147,86 +107,217 @@ class _AdminDashboardState extends State<AdminDashboard> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good Morning';
+    } else if (hour < 17) {
+      return 'Good Afternoon';
+    } else {
+      return 'Good Evening';
+    }
+  }
+
+  Widget _buildTitleBar(BuildContext context) {
+    final now = DateTime.now();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
           children: [
-            const Icon(Icons.security, size: 28),
-            const SizedBox(width: 10),
-            const Text('Campus Security Dashboard'),
+            // Menu button
+            _buildHeaderIconButton(
+              icon: Icons.menu,
+              tooltip: 'Menu',
+              onTap: () => Scaffold.of(context).openDrawer(),
+            ),
+            const SizedBox(width: 12),
+            // Logo and title
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.school, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            // E.A.R.L.Y Title
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [Colors.white, Color(0xFFE3F2FD)],
+              ).createShader(bounds),
+              child: const Text(
+                'E.A.R.L.Y',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2.0,
+                  color: Colors.white,
+                ),
+              ),
+            ),
             const Spacer(),
+            // Time display
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.blue[900]!.withOpacity(0.2),
+                color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.access_time, size: 16, color: Colors.white.withOpacity(0.8)),
+                  Icon(
+                    Icons.access_time,
+                    size: 14,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
                   const SizedBox(width: 6),
                   Text(
-                    DateFormat('hh:mm a').format(DateTime.now()),
+                    DateFormat('hh:mm a').format(now),
                     style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.95),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            // Refresh button
+            _buildHeaderIconButton(
+              icon: Icons.refresh,
+              tooltip: 'Refresh Data',
+              onTap: _fetchDashboardData,
+            ),
+            const SizedBox(width: 8),
+            // Logout button
+            _buildHeaderIconButton(
+              icon: Icons.logout,
+              tooltip: 'Sign Out',
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+                Navigator.pushReplacementNamed(context, '/login');
+              },
+            ),
           ],
         ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1E3A8A), // Royal blue dark
-                Color(0xFF3B82F6), // Royal blue medium
-                Color(0xFF60A5FA), // Royal blue light
-              ],
+      ),
+    );
+  }
+
+  Widget _buildGreetingSection() {
+    final now = DateTime.now();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF3B82F6), Color(0xFF60A5FA)],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '${_getGreeting()} 👋',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.9),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Admin Dashboard',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: Colors.white),
-            onPressed: _fetchDashboardData,
-            tooltip: 'Refresh Data',
-          ),
-          IconButton(
-            icon: Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-            tooltip: 'Sign Out',
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                size: 14,
+                color: Colors.white.withOpacity(0.8),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                DateFormat('EEEE, MMMM d, yyyy').format(now),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.8),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF3B82F6), // Royal blue medium
-              Color(0xFFEFF6FF), // Light blue background
-            ],
-            stops: [0.0, 0.3],
+    );
+  }
+
+  Widget _buildHeaderIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
         ),
-        child: _isLoading 
-            ? const Center(child: CircularProgressIndicator())
-            : _widgetOptions.elementAt(_selectedIndex),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Builder(
+        builder: (context) => Column(
+          children: [
+            // Title Bar with E.A.R.L.Y
+            _buildTitleBar(context),
+            // Content
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(color: Color(0xFFEFF6FF)),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _widgetOptions.elementAt(_selectedIndex),
+              ),
+            ),
+          ],
+        ),
       ),
       drawer: _buildSidebar(),
     );
@@ -275,10 +366,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   const SizedBox(height: 5),
                   Text(
                     'Last sync: ${DateFormat('hh:mm a').format(DateTime.now())}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ],
               ),
@@ -360,8 +448,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _buildDataStatus('Total Students Inside', _studentsInsideCampus),
-                  _buildDataStatus('Students Entered Today', _studentsEnteredToday),
+                  _buildDataStatus(
+                    'Total Students Inside',
+                    _studentsInsideCampus,
+                  ),
+                  _buildDataStatus(
+                    'Students Entered Today',
+                    _studentsEnteredToday,
+                  ),
                   _buildDataStatus('Students Left Today', _studentsLeftToday),
                   _buildDataStatus('Late Arrivals', _lateStudentsToday),
                 ],
@@ -410,10 +504,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -493,10 +584,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                 gradient: const LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [
-                    Color(0xFF1E3A8A),
-                    Color(0xFF3B82F6),
-                  ],
+                  colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
@@ -567,7 +655,8 @@ class _DashboardHomeState extends State<DashboardHome> {
                   iconColor: Colors.white,
                   backgroundColor: const Color(0xFFDC2626), // Red for critical
                   borderColor: const Color(0xFFEF4444),
-                  tooltip: 'Students who scanned IN but have not scanned OUT yet',
+                  tooltip:
+                      'Students who scanned IN but have not scanned OUT yet',
                 ),
                 _buildStatCard(
                   title: 'ENTERED TODAY',
@@ -621,11 +710,7 @@ class _DashboardHomeState extends State<DashboardHome> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.update,
-                    color: Colors.blue[700],
-                    size: 24,
-                  ),
+                  Icon(Icons.update, color: Colors.blue[700], size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -651,7 +736,10 @@ class _DashboardHomeState extends State<DashboardHome> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(20),
@@ -692,10 +780,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Colors.blue.shade50,
-                    Colors.white,
-                  ],
+                  colors: [Colors.blue.shade50, Colors.white],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.blue.shade100),
@@ -705,11 +790,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.info,
-                        color: Colors.blue[700],
-                        size: 24,
-                      ),
+                      Icon(Icons.info, color: Colors.blue[700], size: 24),
                       const SizedBox(width: 12),
                       const Text(
                         'How Metrics Are Calculated',
@@ -760,10 +841,7 @@ class _DashboardHomeState extends State<DashboardHome> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              backgroundColor,
-              backgroundColor.withOpacity(0.9),
-            ],
+            colors: [backgroundColor, backgroundColor.withOpacity(0.9)],
           ),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor.withOpacity(0.3), width: 2),
@@ -794,7 +872,10 @@ class _DashboardHomeState extends State<DashboardHome> {
                   ),
                   if (title == 'STUDENTS INSIDE CAMPUS' && int.parse(value) > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -879,10 +960,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
               ],
             ),
@@ -892,4 +970,3 @@ class _DashboardHomeState extends State<DashboardHome> {
     );
   }
 }
-

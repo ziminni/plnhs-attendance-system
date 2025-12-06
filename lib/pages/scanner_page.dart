@@ -6,7 +6,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import '../services/firebase_service.dart';
+import '../models/models.dart';
 import 'result_page.dart';
+
+/// UI helper class for attendance type selection in scanner
+class AttendanceTypeItem {
+  final String name;
+  final IconData icon;
+  final Color color;
+  final AttendanceType type;
+
+  AttendanceTypeItem(this.name, this.icon, this.color, this.type);
+}
 
 class QRViewExample extends StatefulWidget {
   const QRViewExample({super.key});
@@ -24,7 +35,7 @@ class _QRViewExampleState extends State<QRViewExample>
   bool _isFlashOn = false;
   bool _isScanning = true;
   bool _controlsVisible = true;
-  
+
   late AnimationController _pulseController;
   late AnimationController _slideController;
   late AnimationController _fadeController;
@@ -32,11 +43,31 @@ class _QRViewExampleState extends State<QRViewExample>
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
 
-  final List<AttendanceType> attendanceTypes = [
-    AttendanceType('Morning IN', Icons.wb_sunny_outlined, Colors.orange),
-    AttendanceType('Morning OUT', Icons.wb_sunny, Colors.orange.shade700),
-    AttendanceType('Afternoon IN', Icons.brightness_3_outlined, Colors.blue),
-    AttendanceType('Afternoon OUT', Icons.brightness_3, Colors.blue.shade700),
+  final List<AttendanceTypeItem> attendanceTypes = [
+    AttendanceTypeItem(
+      'Morning IN',
+      Icons.wb_sunny_outlined,
+      Colors.orange,
+      AttendanceType.morningIn,
+    ),
+    AttendanceTypeItem(
+      'Morning OUT',
+      Icons.wb_sunny,
+      Colors.orange.shade700,
+      AttendanceType.morningOut,
+    ),
+    AttendanceTypeItem(
+      'Afternoon IN',
+      Icons.brightness_3_outlined,
+      Colors.blue,
+      AttendanceType.afternoonIn,
+    ),
+    AttendanceTypeItem(
+      'Afternoon OUT',
+      Icons.brightness_3,
+      Colors.blue.shade700,
+      AttendanceType.afternoonOut,
+    ),
   ];
 
   @override
@@ -46,41 +77,30 @@ class _QRViewExampleState extends State<QRViewExample>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
-    _pulseAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.elasticOut,
-    ));
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
-    
+
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.elasticOut),
+        );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
+
     _slideController.forward();
     _fadeController.forward();
   }
@@ -106,7 +126,7 @@ class _QRViewExampleState extends State<QRViewExample>
     setState(() {
       _controlsVisible = !_controlsVisible;
     });
-    
+
     if (_controlsVisible) {
       _fadeController.forward();
     } else {
@@ -123,10 +143,8 @@ class _QRViewExampleState extends State<QRViewExample>
         child: Stack(
           children: [
             // QR Scanner View - Full screen
-            Positioned.fill(
-              child: _buildQrView(context),
-            ),
-            
+            Positioned.fill(child: _buildQrView(context)),
+
             // Top Controls - Animated
             if (_controlsVisible)
               AnimatedBuilder(
@@ -192,7 +210,7 @@ class _QRViewExampleState extends State<QRViewExample>
                 ),
               ),
             ),
-            
+
             // Bottom Controls - Animated
             if (_controlsVisible)
               AnimatedBuilder(
@@ -246,11 +264,7 @@ class _QRViewExampleState extends State<QRViewExample>
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.schedule,
-                  color: Colors.blue,
-                  size: 20,
-                ),
+                child: const Icon(Icons.schedule, color: Colors.blue, size: 20),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -287,18 +301,12 @@ class _QRViewExampleState extends State<QRViewExample>
                           color: type.color.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Icon(
-                          type.icon,
-                          color: type.color,
-                          size: 18,
-                        ),
+                        child: Icon(type.icon, color: type.color, size: 18),
                       ),
                       const SizedBox(width: 12),
                       Text(
                         type.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -335,11 +343,7 @@ class _QRViewExampleState extends State<QRViewExample>
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
-                    size: 24,
-                  ),
+                  const Icon(Icons.check_circle, color: Colors.green, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -394,7 +398,7 @@ class _QRViewExampleState extends State<QRViewExample>
                 ],
               ),
             ),
-          
+
           Row(
             children: [
               Expanded(
@@ -477,8 +481,14 @@ class _QRViewExampleState extends State<QRViewExample>
           height: 20,
           decoration: BoxDecoration(
             border: Border(
-              top: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
-              left: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
+              top: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
+              left: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
             ),
           ),
         ),
@@ -492,8 +502,14 @@ class _QRViewExampleState extends State<QRViewExample>
           height: 20,
           decoration: BoxDecoration(
             border: Border(
-              top: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
-              right: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
+              top: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
+              right: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
             ),
           ),
         ),
@@ -507,8 +523,14 @@ class _QRViewExampleState extends State<QRViewExample>
           height: 20,
           decoration: BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
-              left: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
+              bottom: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
+              left: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
             ),
           ),
         ),
@@ -522,8 +544,14 @@ class _QRViewExampleState extends State<QRViewExample>
           height: 20,
           decoration: BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
-              right: BorderSide(color: _isScanning ? Colors.green : Colors.red, width: 3),
+              bottom: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
+              right: BorderSide(
+                color: _isScanning ? Colors.green : Colors.red,
+                width: 3,
+              ),
             ),
           ),
         ),
@@ -533,7 +561,7 @@ class _QRViewExampleState extends State<QRViewExample>
 
   Widget _buildQrView(BuildContext context) {
     const scanArea = 320.0; // Fixed scan area size
-    
+
     return QRView(
       key: qrKey,
       onQRViewCreated: _onQRViewCreated,
@@ -574,12 +602,23 @@ class _QRViewExampleState extends State<QRViewExample>
     await controller?.pauseCamera();
 
     try {
-      String attendanceType = selectedAttendanceType.toLowerCase().replaceAll(' ', '_');
-      log('Processing attendance type: $attendanceType');
-      Map<String, dynamic>? userData = await _fetchUserData(lrn);
+      // Get the AttendanceType enum from selected string
+      final attendanceType = AttendanceType.fromString(selectedAttendanceType);
+      log('Processing attendance type: ${attendanceType.displayName}');
+
+      // Fetch user data (student or teacher)
+      final userData = await _fetchUserData(lrn);
       if (userData == null) {
         log('User not found for LRN: $lrn');
-        _showPopupAndAutoDismiss(context, false, 'Unknown User', lrn, 'N/A', attendanceType, false);
+        _showPopupAndAutoDismiss(
+          context,
+          false,
+          'Unknown User',
+          lrn,
+          'N/A',
+          attendanceType.displayName,
+          false,
+        );
         return;
       }
 
@@ -594,31 +633,39 @@ class _QRViewExampleState extends State<QRViewExample>
         if (logDoc.exists) {
           var data = logDoc.data() as Map<String, dynamic>?;
           if (data != null) {
-            switch (attendanceType) {
-              case 'morning_in':
-                isDone = data['morningIn'] != null;
-                break;
-              case 'morning_out':
-                isDone = data['morningOut'] != null;
-                break;
-              case 'afternoon_in':
-                isDone = data['afternoonIn'] != null;
-                break;
-              case 'afternoon_out':
-                isDone = data['afternoonOut'] != null;
-                break;
-            }
+            // Check if attendance already logged using the enum's firestoreField
+            isDone = data[attendanceType.firestoreField] != null;
           }
         }
 
         if (!isDone) {
           await FirebaseService.logAttendance(lrn, attendanceType);
-          log('Student attendance logged for LRN: $lrn, Type: $attendanceType');
-          String fullName = '${userData['firstname'] ?? ''} ${userData['middlename'] ?? ''} ${userData['lastname'] ?? ''}'.trim();
+          log(
+            'Student attendance logged for LRN: $lrn, Type: ${attendanceType.displayName}',
+          );
+          String fullName =
+              '${userData['firstname'] ?? ''} ${userData['middlename'] ?? ''} ${userData['lastname'] ?? ''}'
+                  .trim();
           String section = userData['grade_and_section'] ?? 'Unknown';
-          _showPopupAndAutoDismiss(context, true, fullName, lrn, section, attendanceType, false);
+          _showPopupAndAutoDismiss(
+            context,
+            true,
+            fullName,
+            lrn,
+            section,
+            attendanceType.displayName,
+            false,
+          );
         } else {
-          _showPopupAndAutoDismiss(context, true, 'Already Done', lrn, 'N/A', attendanceType, true);
+          _showPopupAndAutoDismiss(
+            context,
+            true,
+            'Already Done',
+            lrn,
+            'N/A',
+            attendanceType.displayName,
+            true,
+          );
         }
       } else if (label == 'teacher') {
         DocumentSnapshot logDoc = await FirebaseFirestore.instance
@@ -628,63 +675,101 @@ class _QRViewExampleState extends State<QRViewExample>
         if (logDoc.exists) {
           var data = logDoc.data() as Map<String, dynamic>?;
           if (data != null) {
-            switch (attendanceType) {
-              case 'morning_in':
-                isDone = data['morningIn'] != null;
-                break;
-              case 'morning_out':
-                isDone = data['morningOut'] != null;
-                break;
-              case 'afternoon_in':
-                isDone = data['afternoonIn'] != null;
-                break;
-              case 'afternoon_out':
-                isDone = data['afternoonOut'] != null;
-                break;
-            }
+            // Check if attendance already logged using the enum's firestoreField
+            isDone = data[attendanceType.firestoreField] != null;
           }
         }
 
         if (!isDone) {
           await FirebaseService.logTeacherAttendance(lrn, attendanceType);
-          log('Teacher attendance logged for LRN: $lrn, Type: $attendanceType');
+          log(
+            'Teacher attendance logged for LRN: $lrn, Type: ${attendanceType.displayName}',
+          );
           String fullName = userData['fullname'] ?? 'Unknown';
-          _showPopupAndAutoDismiss(context, true, fullName, lrn, 'N/A', attendanceType, false);
+          _showPopupAndAutoDismiss(
+            context,
+            true,
+            fullName,
+            lrn,
+            'N/A',
+            attendanceType.displayName,
+            false,
+          );
         } else {
-          _showPopupAndAutoDismiss(context, true, 'Already Done', lrn, 'N/A', attendanceType, true);
+          _showPopupAndAutoDismiss(
+            context,
+            true,
+            'Already Done',
+            lrn,
+            'N/A',
+            attendanceType.displayName,
+            true,
+          );
         }
       } else {
-        _showPopupAndAutoDismiss(context, false, 'Unknown User Type', lrn, 'N/A', attendanceType, false);
+        _showPopupAndAutoDismiss(
+          context,
+          false,
+          'Unknown User Type',
+          lrn,
+          'N/A',
+          attendanceType.displayName,
+          false,
+        );
       }
     } catch (e) {
       log('Error handling scan: $e');
-      _showPopupAndAutoDismiss(context, false, 'Error', lrn, 'N/A', selectedAttendanceType.toLowerCase().replaceAll(' ', '_'), false);
+      _showPopupAndAutoDismiss(
+        context,
+        false,
+        'Error',
+        lrn,
+        'N/A',
+        selectedAttendanceType,
+        false,
+      );
     } finally {
       _resumeAndReset();
     }
   }
 
   Future<Map<String, dynamic>?> _fetchUserData(String lrn) async {
-    // Try students collection first
-    Map<String, dynamic>? data = await FirebaseService.getStudentByLrn(lrn);
-    if (data != null && data['label'] == 'student') {
-      log('Found student data for LRN: $lrn');
+    // Run both queries in parallel for faster lookup
+    final results = await Future.wait([
+      FirebaseService.getStudentByLrn(lrn),
+      FirebaseService.getTeacherByLrn(lrn),
+    ]);
+
+    final student = results[0] as Student?;
+    final teacher = results[1] as Teacher?;
+
+    if (student != null) {
+      log('Found student for LRN: $lrn');
+      final data = student.toMap();
+      data['label'] = 'student';
       return data;
     }
-    // If not found or not a student, try teachers collection
-    DocumentSnapshot teacherDoc = await FirebaseFirestore.instance
-        .collection('teachers')
-        .doc(lrn)
-        .get();
-    if (teacherDoc.exists) {
-      log('Found teacher data for LRN: $lrn');
-      return teacherDoc.data() as Map<String, dynamic>?;
+
+    if (teacher != null) {
+      log('Found teacher for LRN: $lrn');
+      final data = teacher.toMap();
+      data['label'] = 'teacher';
+      return data;
     }
+
     log('No data found for LRN: $lrn');
     return null;
   }
 
-  void _showPopupAndAutoDismiss(BuildContext context, bool isSuccess, String name, String lrn, String section, String attendanceType, bool isDone) {
+  void _showPopupAndAutoDismiss(
+    BuildContext context,
+    bool isSuccess,
+    String name,
+    String lrn,
+    String section,
+    String attendanceType,
+    bool isDone,
+  ) {
     Navigator.push(
       context,
       PageRouteBuilder(
@@ -703,9 +788,10 @@ class _QRViewExampleState extends State<QRViewExample>
           const end = Offset.zero;
           const curve = Curves.easeInOutCubic;
 
-          var tween = Tween(begin: begin, end: end).chain(
-            CurveTween(curve: curve),
-          );
+          var tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
 
           return SlideTransition(
             position: animation.drive(tween),
@@ -754,12 +840,4 @@ class _QRViewExampleState extends State<QRViewExample>
       );
     }
   }
-}
-
-class AttendanceType {
-  final String name;
-  final IconData icon;
-  final Color color;
-
-  AttendanceType(this.name, this.icon, this.color);
 }

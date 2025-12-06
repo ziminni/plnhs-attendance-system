@@ -48,9 +48,6 @@ class _AdminResponsiveScaffoldState extends State<AdminResponsiveScaffold> {
 
   Widget _buildDesktop() {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Website Early!")
-        ),
       drawer: Drawer(
         child: ListView(
           children: [
