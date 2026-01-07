@@ -13,9 +13,6 @@ class StudentsLogs extends StatefulWidget {
 
 class _StudentsLogsState extends State<StudentsLogs> {
   DateTime _selectedDate = DateTime.now();
-  List<StudentLog> _allLogs = [];
-  List<StudentLog> _filteredLogs = [];
-  bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -27,7 +24,6 @@ class _StudentsLogsState extends State<StudentsLogs> {
   @override
   void initState() {
     super.initState();
-    _loadLogs();
   }
 
   @override
@@ -36,38 +32,9 @@ class _StudentsLogsState extends State<StudentsLogs> {
     super.dispose();
   }
 
-  Future<void> _loadLogs() async {
-    setState(() => _isLoading = true);
-    try {
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      final logs = await FirebaseService.getStudentLogsByDate(dateStr);
-
-      // Sort by name
-      logs.sort((a, b) => a.fullName.compareTo(b.fullName));
-
-      setState(() {
-        _allLogs = logs;
-        _filteredLogs = logs;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading logs: $e');
-      setState(() => _isLoading = false);
-    }
-  }
-
   void _filterLogs(String query) {
     setState(() {
       _searchQuery = query.toLowerCase();
-      if (_searchQuery.isEmpty) {
-        _filteredLogs = _allLogs;
-      } else {
-        _filteredLogs = _allLogs.where((log) {
-          return log.fullName.toLowerCase().contains(_searchQuery) ||
-              (log.lrn?.toLowerCase().contains(_searchQuery) ?? false) ||
-              log.yearAndSection.toLowerCase().contains(_searchQuery);
-        }).toList();
-      }
     });
   }
 
@@ -93,19 +60,10 @@ class _StudentsLogsState extends State<StudentsLogs> {
     );
     if (picked != null && picked != _selectedDate) {
       setState(() => _selectedDate = picked);
-      _loadLogs();
     }
   }
 
-  // Calculate stats
-  int get _presentCount => _allLogs
-      .where((log) => log.morningIn != null || log.afternoonIn != null)
-      .length;
-
-  int get _lateCount => _allLogs.where((log) => log.wasLate).length;
-
-  int get _insideCampusCount =>
-      _allLogs.where((log) => log.isInsideCampus).length;
+  // These getters are computed per-build using the latest stream data.
 
   @override
   Widget build(BuildContext context) {
@@ -115,11 +73,39 @@ class _StudentsLogsState extends State<StudentsLogs> {
         children: [
           _buildHeader(),
           Expanded(
-            child: _isLoading
-                ? const Center(
+            child: StreamBuilder<List<StudentLog>>(
+              stream: FirebaseService.getStudentLogsStreamByDate(
+                DateFormat('yyyy-MM-dd').format(_selectedDate),
+              ),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
                     child: CircularProgressIndicator(color: _primaryBlue),
-                  )
-                : _buildContent(),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+
+                final allLogs = (snapshot.data ?? <StudentLog>[]).toList();
+                allLogs.sort((a, b) => a.fullName.compareTo(b.fullName));
+
+                final filteredLogs = _searchQuery.isEmpty
+                    ? allLogs
+                    : allLogs.where((log) {
+                        return log.fullName.toLowerCase().contains(
+                              _searchQuery,
+                            ) ||
+                            (log.lrn?.toLowerCase().contains(_searchQuery) ??
+                                false) ||
+                            log.yearAndSection.toLowerCase().contains(
+                              _searchQuery,
+                            );
+                      }).toList();
+
+                return _buildContentFromLogs(allLogs, filteredLogs);
+              },
+            ),
           ),
         ],
       ),
@@ -190,7 +176,13 @@ class _StudentsLogsState extends State<StudentsLogs> {
                   icon: Icons.file_download,
                   label: 'Export',
                   onTap: () async {
-                    if (_allLogs.isEmpty) {
+                    final dateStr = DateFormat(
+                      'yyyy-MM-dd',
+                    ).format(_selectedDate);
+                    final logs = await FirebaseService.getStudentLogsByDate(
+                      dateStr,
+                    );
+                    if (logs.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('No data to export')),
                       );
@@ -198,7 +190,7 @@ class _StudentsLogsState extends State<StudentsLogs> {
                     }
                     try {
                       await ExcelExportService.exportStudentLogs(
-                        _allLogs,
+                        logs,
                         _selectedDate,
                       );
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -366,7 +358,16 @@ class _StudentsLogsState extends State<StudentsLogs> {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContentFromLogs(
+    List<StudentLog> allLogs,
+    List<StudentLog> filteredLogs,
+  ) {
+    final presentCount = allLogs
+        .where((log) => log.morningIn != null || log.afternoonIn != null)
+        .length;
+    final lateCount = allLogs.where((log) => log.wasLate).length;
+    final insideCampusCount = allLogs.where((log) => log.isInsideCampus).length;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -376,28 +377,28 @@ class _StudentsLogsState extends State<StudentsLogs> {
             children: [
               _buildStatCard(
                 title: 'Total Logs',
-                value: '${_allLogs.length}',
+                value: '${allLogs.length}',
                 icon: Icons.people,
                 color: _mediumBlue,
               ),
               const SizedBox(width: 16),
               _buildStatCard(
                 title: 'Present',
-                value: '$_presentCount',
+                value: '$presentCount',
                 icon: Icons.check_circle,
                 color: Colors.green,
               ),
               const SizedBox(width: 16),
               _buildStatCard(
                 title: 'Late Arrivals',
-                value: '$_lateCount',
+                value: '$lateCount',
                 icon: Icons.access_time,
                 color: Colors.orange,
               ),
               const SizedBox(width: 16),
               _buildStatCard(
                 title: 'Inside Campus',
-                value: '$_insideCampusCount',
+                value: '$insideCampusCount',
                 icon: Icons.location_on,
                 color: Colors.purple,
               ),
@@ -437,7 +438,7 @@ class _StudentsLogsState extends State<StudentsLogs> {
                     child: Row(
                       children: [
                         Text(
-                          'Showing ${_filteredLogs.length} of ${_allLogs.length} students',
+                          'Showing ${filteredLogs.length} of ${allLogs.length} students',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -481,9 +482,9 @@ class _StudentsLogsState extends State<StudentsLogs> {
 
                   // Table Content
                   Expanded(
-                    child: _filteredLogs.isEmpty
+                    child: filteredLogs.isEmpty
                         ? _buildEmptyState()
-                        : _buildDataTable(),
+                        : _buildDataTableFromLogs(filteredLogs),
                   ),
                 ],
               ),
@@ -571,7 +572,7 @@ class _StudentsLogsState extends State<StudentsLogs> {
     );
   }
 
-  Widget _buildDataTable() {
+  Widget _buildDataTableFromLogs(List<StudentLog> logs) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -600,7 +601,7 @@ class _StudentsLogsState extends State<StudentsLogs> {
                   DataColumn(label: Text('PM OUT')),
                   DataColumn(label: Text('STATUS')),
                 ],
-                rows: _filteredLogs.map((log) => _buildDataRow(log)).toList(),
+                rows: logs.map((log) => _buildDataRow(log)).toList(),
               ),
             ),
           ),

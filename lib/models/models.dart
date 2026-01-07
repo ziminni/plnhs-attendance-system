@@ -1,5 +1,5 @@
 /// Export all models from a single file for convenience
-library models;
+library;
 
 export 'student_model.dart';
 export 'teacher_model.dart';

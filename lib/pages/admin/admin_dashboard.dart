@@ -1,7 +1,10 @@
+// Replace the entire admin_dashboard.dart with this corrected version:
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'teachers_logs.dart';
 import 'students_logs.dart';
 import 'teacher_management.dart';
@@ -9,7 +12,10 @@ import 'student_management.dart';
 import 'archive_logs.dart';
 
 import '/services/firebase_service.dart';
-import '/models/models.dart';
+
+// Import the models directly to avoid the error
+import '/models/student_model.dart' as student_model;
+import '/models/teacher_model.dart' as teacher_model;
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -26,7 +32,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int _studentsEnteredToday = 0;
   int _studentsLeftToday = 0;
   int _lateStudentsToday = 0;
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   // List of widget options for the dashboard
   final List<Widget> _widgetOptions = [
@@ -41,7 +47,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    _fetchDashboardData();
   }
 
   @override
@@ -94,7 +99,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _isLoading = false;
       });
     } catch (error) {
-      print('Error fetching dashboard data: $error');
+      developer.log('Error fetching dashboard data: $error', name: 'AdminDashboard');
       setState(() {
         _isLoading = false;
       });
@@ -145,7 +150,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: const Color(0xFFFFFFFF).withOpacity(0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.school, color: Colors.white, size: 22),
@@ -171,7 +176,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: const Color(0xFFFFFFFF).withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -180,26 +185,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   Icon(
                     Icons.access_time,
                     size: 14,
-                    color: Colors.white.withOpacity(0.9),
+                    color: const Color(0xFFFFFFFF).withOpacity(0.9),
                   ),
                   const SizedBox(width: 6),
                   Text(
                     DateFormat('hh:mm a').format(now),
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.white.withOpacity(0.95),
+                      color: const Color(0xFFFFFFFF).withOpacity(0.95),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
+
             const SizedBox(width: 8),
             // Refresh button
             _buildHeaderIconButton(
               icon: Icons.refresh,
               tooltip: 'Refresh Data',
-              onTap: _fetchDashboardData,
+              onTap: () => setState(() {}),
             ),
             const SizedBox(width: 8),
             // Logout button
@@ -208,71 +214,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
               tooltip: 'Sign Out',
               onTap: () async {
                 await FirebaseAuth.instance.signOut();
-                Navigator.pushReplacementNamed(context, '/login');
+                if (mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
               },
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildGreetingSection() {
-    final now = DateTime.now();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF3B82F6), Color(0xFF60A5FA)],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '${_getGreeting()} 👋',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Admin Dashboard',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today,
-                size: 14,
-                color: Colors.white.withOpacity(0.8),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                DateFormat('EEEE, MMMM d, yyyy').format(now),
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white.withOpacity(0.8),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -285,7 +233,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.white.withOpacity(0.15),
+        color: const Color(0xFFFFFFFF).withOpacity(0.15),
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
@@ -476,19 +424,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isSelected ? Colors.white.withOpacity(0.15) : Colors.transparent,
+        color: isSelected ? const Color(0xFFFFFFFF).withOpacity(0.15) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
         leading: Icon(
           icon,
-          color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+          color: isSelected ? Colors.white : const Color(0xFFFFFFFF).withOpacity(0.7),
         ),
         title: Text(
           title,
           style: TextStyle(
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? Colors.white : Colors.white.withOpacity(0.9),
+            color: isSelected ? Colors.white : const Color(0xFFFFFFFF).withOpacity(0.9),
           ),
         ),
         onTap: () => _onItemTapped(index),
@@ -509,7 +457,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: const Color(0xFFFFFFFF).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -536,7 +484,6 @@ class DashboardHome extends StatefulWidget {
 }
 
 class _DashboardHomeState extends State<DashboardHome> {
-  late _AdminDashboardState parentState;
   Timer? _clockTimer;
 
   @override
@@ -548,7 +495,6 @@ class _DashboardHomeState extends State<DashboardHome> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    parentState = context.findAncestorStateOfType<_AdminDashboardState>()!;
   }
 
   @override
@@ -570,6 +516,7 @@ class _DashboardHomeState extends State<DashboardHome> {
     final now = DateTime.now();
     final formattedDate = DateFormat('EEEE, MMMM d, yyyy').format(now);
     final formattedTime = DateFormat('hh:mm:ss a').format(now);
+    final todayDateStr = DateFormat('yyyy-MM-dd').format(now);
 
     return SingleChildScrollView(
       child: Padding(
@@ -626,7 +573,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                           formattedTime,
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.white.withOpacity(0.9),
+                            color: const Color(0xFFFFFFFF).withOpacity(0.9),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -638,60 +585,311 @@ class _DashboardHomeState extends State<DashboardHome> {
             ),
             const SizedBox(height: 30),
 
-            // Real-time Statistics Cards
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 4 : 2,
-              crossAxisSpacing: 20,
-              mainAxisSpacing: 20,
-              childAspectRatio: 1.3,
-              children: [
-                _buildStatCard(
-                  title: 'STUDENTS INSIDE CAMPUS',
-                  value: parentState._studentsInsideCampus.toString(),
-                  subtitle: 'Currently Present',
-                  icon: Icons.person_pin_circle,
-                  iconColor: Colors.white,
-                  backgroundColor: const Color(0xFFDC2626), // Red for critical
-                  borderColor: const Color(0xFFEF4444),
-                  tooltip:
-                      'Students who scanned IN but have not scanned OUT yet',
-                ),
-                _buildStatCard(
-                  title: 'ENTERED TODAY',
-                  value: parentState._studentsEnteredToday.toString(),
-                  subtitle: 'Total IN Scans',
-                  icon: Icons.login,
-                  iconColor: Colors.white,
-                  backgroundColor: const Color(0xFF2563EB), // Blue
-                  borderColor: const Color(0xFF3B82F6),
-                  tooltip: 'Total number of "IN" scans for the day',
-                ),
-                _buildStatCard(
-                  title: 'LEFT TODAY',
-                  value: parentState._studentsLeftToday.toString(),
-                  subtitle: 'Total OUT Scans',
-                  icon: Icons.logout,
-                  iconColor: Colors.white,
-                  backgroundColor: const Color(0xFF059669), // Green
-                  borderColor: const Color(0xFF10B981),
-                  tooltip: 'How many students scanned OUT today',
-                ),
-                _buildStatCard(
-                  title: 'LATE ARRIVALS',
-                  value: parentState._lateStudentsToday.toString(),
-                  subtitle: 'After 7:30 AM',
-                  icon: Icons.access_time,
-                  iconColor: Colors.white,
-                  backgroundColor: const Color(0xFFD97706), // Amber
-                  borderColor: const Color(0xFFF59E0B),
-                  tooltip: 'Students who entered after official time (7:30 AM)',
-                ),
-              ],
-            ),
+            // Early Risers section (moved to top)
+            StreamBuilder<EarlyRiserResults>(
+              stream: FirebaseService.getEarlyRisersStream(days: 30),
+              builder: (context, snapshot) {
+                final results = snapshot.data;
+                final students = results?.students.take(5).toList() ?? [];
+                final teachers = results?.teachers.take(5).toList() ?? [];
 
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.wb_sunny,
+                              color: Colors.orange,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Top Early Risers (Last 30 Days)',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueGrey,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline,
+                                    size: 14, color: Colors.orange),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Arrivals before 6:30 AM',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildEarlyRiserCard(
+                              '🏆 Top Early Students',
+                              students,
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: _buildEarlyRiserCard(
+                              '👨‍🏫 Top Early Teachers',
+                              teachers,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 30),
+
+            // Real-time Statistics Cards
+            StreamBuilder<DashboardMetrics>(
+              stream: FirebaseService.getDashboardMetricsStream(),
+              builder: (context, snapshot) {
+                final metrics =
+                    snapshot.data ??
+                        DashboardMetrics(
+                          studentsInsideCampus: 0,
+                          studentsEnteredToday: 0,
+                          studentsLeftToday: 0,
+                          lateStudentsToday: 0,
+                        );
+
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 4 : 2,
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 1.3,
+                  children: [
+                    _buildStatCard(
+                      title: 'STUDENTS INSIDE CAMPUS',
+                      value: metrics.studentsInsideCampus.toString(),
+                      subtitle: 'Currently Present',
+                      icon: Icons.person_pin_circle,
+                      iconColor: Colors.white,
+                      backgroundColor: const Color(0xFFDC2626), // Red for critical
+                      borderColor: const Color(0xFFEF4444),
+                      tooltip:
+                          'Students who scanned IN but have not scanned OUT yet',
+                    ),
+                    _buildStatCard(
+                      title: 'ENTERED TODAY',
+                      value: metrics.studentsEnteredToday.toString(),
+                      subtitle: 'Total IN Scans',
+                      icon: Icons.login,
+                      iconColor: Colors.white,
+                      backgroundColor: const Color(0xFF2563EB), // Blue
+                      borderColor: const Color(0xFF3B82F6),
+                      tooltip: 'Total number of "IN" scans for the day',
+                    ),
+                    _buildStatCard(
+                      title: 'LEFT TODAY',
+                      value: metrics.studentsLeftToday.toString(),
+                      subtitle: 'Total OUT Scans',
+                      icon: Icons.logout,
+                      iconColor: Colors.white,
+                      backgroundColor: const Color(0xFF059669), // Green
+                      borderColor: const Color(0xFF10B981),
+                      tooltip: 'How many students scanned OUT today',
+                    ),
+                    _buildStatCard(
+                      title: 'LATE ARRIVALS',
+                      value: metrics.lateStudentsToday.toString(),
+                      subtitle: 'After 7:30 AM',
+                      icon: Icons.access_time,
+                      iconColor: Colors.white,
+                      backgroundColor: const Color(0xFFD97706), // Amber
+                      borderColor: const Color(0xFFF59E0B),
+                      tooltip:
+                          'Students who entered after official time (7:30 AM)',
+                    ),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 40),
+
+            // New Section: Attendance Issues
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade100),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.warning,
+                          color: Colors.red,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Attendance Issues',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.refresh, size: 14, color: Colors.red),
+                            SizedBox(width: 6),
+                            Text(
+                              'Auto-refresh every 5s',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Row with three tables
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Absent Students
+                      Expanded(
+                        child: StreamBuilder<List<student_model.Student>>(
+                          stream: FirebaseService.getAbsentStudentsStream(todayDateStr),
+                          builder: (context, snapshot) {
+                            final absentStudents = snapshot.data ?? [];
+                            return _buildAttendanceIssueCard(
+                              '👨‍🎓 Absent Students',
+                              'Total: ${absentStudents.length}',
+                              Icons.person_off,
+                              Colors.red,
+                              absentStudents.map((student) => {
+                                'id': student.lrn,
+                                'name': student.fullName,
+                                'info': student.gradeAndSection ?? 'No Section',
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      
+                      // Absent Teachers
+                      Expanded(
+                        child: StreamBuilder<List<teacher_model.Teacher>>(
+                          stream: FirebaseService.getAbsentTeachersStream(todayDateStr),
+                          builder: (context, snapshot) {
+                            final absentTeachers = snapshot.data ?? [];
+                            return _buildAttendanceIssueCard(
+                              '👨‍🏫 Absent Teachers',
+                              'Total: ${absentTeachers.length}',
+                              Icons.person_off_outlined,
+                              Colors.orange,
+                              absentTeachers.map((teacher) => {
+                                'id': teacher.lrn,
+                                'name': teacher.fullname,
+                                'info': teacher.department ?? 'No Department',
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      
+                      // Incomplete Logs
+                      Expanded(
+                        child: StreamBuilder<List<Map<String, dynamic>>>(
+                          stream: FirebaseService.getIncompleteLogsStream(todayDateStr),
+                          builder: (context, snapshot) {
+                            final incompleteLogs = snapshot.data ?? [];
+                            return _buildIncompleteLogsCard(incompleteLogs);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
 
             // Live Update Status
             Container(
@@ -770,7 +968,6 @@ class _DashboardHomeState extends State<DashboardHome> {
                 ],
               ),
             ),
-
             const SizedBox(height: 30),
 
             // Information Panel
@@ -802,7 +999,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   _buildInfoItem(
                     'Students Inside Campus',
                     'Counts students who scanned IN but have not scanned OUT yet. This includes both morning and afternoon sessions.',
@@ -812,8 +1009,12 @@ class _DashboardHomeState extends State<DashboardHome> {
                     'Students who scanned IN after 7:30 AM in the morning session. Afternoon arrivals are not counted as late.',
                   ),
                   _buildInfoItem(
-                    'Updates',
-                    'Manual refresh is available via the refresh button.',
+                    'Absent Tracking',
+                    'Users without any IN scans for the day are marked as absent. Lists update automatically every 5 seconds.',
+                  ),
+                  _buildInfoItem(
+                    'Incomplete Logs',
+                    'Users who scanned IN but missed OUT scans, or scanned OUT but missed subsequent IN scans.',
                   ),
                 ],
               ),
@@ -865,7 +1066,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: const Color(0xFFFFFFFF).withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(icon, size: 28, color: iconColor),
@@ -877,7 +1078,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: const Color(0xFFFFFFFF).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Row(
@@ -912,14 +1113,14 @@ class _DashboardHomeState extends State<DashboardHome> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.9),
+                  color: const Color(0xFFFFFFFF).withOpacity(0.9),
                 ),
               ),
               Text(
                 subtitle,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.7),
+                  color: const Color(0xFFFFFFFF).withOpacity(0.7),
                 ),
               ),
             ],
@@ -965,6 +1166,476 @@ class _DashboardHomeState extends State<DashboardHome> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEarlyRiserCard(String title, List<EarlyRiser> list) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueGrey,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (list.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.0),
+              child: Text(
+                'No early arrivals in the selected period.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else
+            SizedBox(
+              height: 180,
+              child: ListView.builder(
+                itemCount: list.length,
+                itemBuilder: (context, index) {
+                  final item = list[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'ID: ${item.id}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${item.earlyCount} days',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
+                            Text(
+                              '${item.points} pts',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceIssueCard(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    List<Map<String, dynamic>> items,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 20, color: color),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueGrey,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (items.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle, size: 40, color: Colors.green.shade300),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'All Present',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 200,
+              child: ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['name'],
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'ID: ${item['id']}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            item['info'],
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: color,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIncompleteLogsCard(List<Map<String, dynamic>> incompleteLogs) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.warning_amber, size: 20, color: Colors.orange),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '⚠️ Incomplete Logs',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueGrey,
+                      ),
+                    ),
+                    Text(
+                      'Total: ${incompleteLogs.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (incompleteLogs.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle, size: 40, color: Colors.green.shade300),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'All Complete',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 200,
+              child: ListView.builder(
+                itemCount: incompleteLogs.length,
+                itemBuilder: (context, index) {
+                  final log = incompleteLogs[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: log['type'] == 'Student'
+                                ? Colors.blue.withOpacity(0.1)
+                                : Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              log['type'] == 'Student' ? 'S' : 'T',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: log['type'] == 'Student'
+                                    ? Colors.blue
+                                    : Colors.orange,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                log['name'],
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'ID: ${log['id']}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: (log['issues'] as List<String>)
+                                    .map((issue) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: Colors.red.shade100,
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            issue,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.red.shade700,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );

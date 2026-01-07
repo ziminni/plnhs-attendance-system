@@ -1,11 +1,8 @@
-import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 
 // Add conditional import at the top of the file
-import 'excel_export_service_stub.dart'
-    if (dart.library.html) 'excel_export_service_web.dart';
 
 // For web download
 // ignore: avoid_web_libraries_in_flutter
