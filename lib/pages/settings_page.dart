@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:developer';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firebase_service.dart';
+import '../services/local_db_service.dart';
 import '../models/models.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -13,6 +17,8 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   AppUser? _currentUser;
   bool _isLoading = true;
+  DateTime? _lastSyncTime;
+  DateTime? _lastUploadTime;
 
   @override
   void initState() {
@@ -107,6 +113,10 @@ class _SettingsPageState extends State<SettingsPage> {
                       _buildProfileCard(),
                       const SizedBox(height: 20),
 
+                      // Sync and Upload Buttons
+                      _buildSyncUploadButtons(),
+                      const SizedBox(height: 20),
+
                       // Account Info Card
                       _buildAccountInfoCard(),
                       const SizedBox(height: 20),
@@ -123,6 +133,102 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
       ),
+    );
+  }
+
+  Widget _buildSyncUploadButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: _syncStaffData,
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.blue.shade600,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.sync, size: 40, color: Colors.white),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Sync',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _lastSyncTime == null
+                        ? 'Never'
+                        : _formatTimeAgo(_lastSyncTime!),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: GestureDetector(
+            onTap: _syncAttendanceToFirebase,
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.green.shade600,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_upload, size: 40, color: Colors.white),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Upload',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _lastUploadTime == null
+                        ? 'Never'
+                        : _formatTimeAgo(_lastUploadTime!),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -386,5 +492,300 @@ class _SettingsPageState extends State<SettingsPage> {
   String _formatDateTime(DateTime? dateTime) {
     if (dateTime == null) return 'N/A';
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 30) {
+      return '${difference.inDays}d ago';
+    } else {
+      return _formatDateTime(dateTime);
+    }
+  }
+
+  Future<void> _syncStaffData() async {
+    log('🔄 Starting staff data sync from Firebase...');
+
+    // Check internet connection
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      if (result.isEmpty || result[0].rawAddress.isEmpty) {
+        throw const SocketException('No internet');
+      }
+    } on SocketException catch (_) {
+      log('❌ No internet connection');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ No internet connection available'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Syncing staff & student data...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final dbService = LocalDbService();
+      int synced = 0;
+
+      // Fetch all teachers from Firebase
+      try {
+        log('📥 Fetching teachers...');
+        final teachersSnapshot = await FirebaseFirestore.instance
+            .collection('teachers')
+            .get();
+        log('📥 Found ${teachersSnapshot.docs.length} teachers in Firebase');
+
+        for (var doc in teachersSnapshot.docs) {
+          try {
+            final teacherData = doc.data();
+            log('📥 Teacher raw data: $teacherData');
+            final lrn = (teacherData['lrn'] ?? doc.id)
+                .toString()
+                .trim()
+                .toLowerCase();
+
+            final fullName =
+                teacherData['fullName'] ??
+                teacherData['full_name'] ??
+                teacherData['name'] ??
+                teacherData['fullname'] ??
+                'Unknown';
+            log(
+              '📥 Extracted fullName: "$fullName" from keys: ${teacherData.keys}',
+            );
+
+            final staffData = {
+              'id_number': lrn,
+              'fullname': fullName,
+              'phone_number':
+                  teacherData['contactNumber'] ??
+                  teacherData['contact_number'] ??
+                  'N/A',
+            };
+
+            await dbService.insertOrUpdateStaff(staffData);
+            synced++;
+            log('✅ Synced teacher: $lrn - $fullName');
+          } catch (e, stackTrace) {
+            log('⚠️ Failed to sync teacher: $e\n$stackTrace');
+          }
+        }
+      } catch (e, stackTrace) {
+        log('❌ Error fetching teachers: $e\n$stackTrace');
+      }
+
+      // Fetch all students from Firebase
+      try {
+        log('📥 Fetching students...');
+        final studentsSnapshot = await FirebaseFirestore.instance
+            .collection('students')
+            .get();
+        log('📥 Found ${studentsSnapshot.docs.length} students in Firebase');
+
+        for (var doc in studentsSnapshot.docs) {
+          try {
+            final studentData = doc.data();
+            log('📥 Student raw data: $studentData');
+            final lrn = (studentData['lrn'] ?? doc.id)
+                .toString()
+                .trim()
+                .toLowerCase();
+
+            final fullName =
+                studentData['fullName'] ??
+                studentData['full_name'] ??
+                studentData['name'] ??
+                studentData['fullname'] ??
+                'Unknown';
+            log(
+              '📥 Extracted fullName: "$fullName" from keys: ${studentData.keys}',
+            );
+
+            final staffData = {
+              'id_number': lrn,
+              'fullname': fullName,
+              'phone_number':
+                  studentData['contactNumber'] ??
+                  studentData['contact_number'] ??
+                  'N/A',
+            };
+
+            await dbService.insertOrUpdateStaff(staffData);
+            synced++;
+            log('✅ Synced student: $lrn - $fullName');
+          } catch (e, stackTrace) {
+            log('⚠️ Failed to sync student: $e\n$stackTrace');
+          }
+        }
+      } catch (e, stackTrace) {
+        log('❌ Error fetching students: $e\n$stackTrace');
+      }
+
+      log('✅ Sync completed! $synced total records synced');
+
+      if (mounted) {
+        setState(() {
+          _lastSyncTime = DateTime.now();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced $synced staff & students'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      log('❌ Sync failed: $e\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Sync failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncAttendanceToFirebase() async {
+    log('🔄 Starting attendance upload to Firebase...');
+
+    // Check internet connection
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      if (result.isEmpty || result[0].rawAddress.isEmpty) {
+        throw const SocketException('No internet');
+      }
+    } on SocketException catch (_) {
+      log('❌ No internet connection');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ No internet connection available'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Uploading attendance records...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final dbService = LocalDbService();
+      int uploaded = 0;
+
+      // Get all staff from local DB
+      final staffList = await dbService.getAllStaff();
+      log('📤 Found ${staffList.length} staff records to sync');
+
+      for (var staff in staffList) {
+        try {
+          final staffId = staff['id'];
+          final lrn = staff['id_number'];
+          final fullName = staff['fullname'];
+
+          // Get all attendance records for this staff
+          final attendanceRecords = await dbService.getAttendanceByStaff(
+            staffId,
+          );
+          log(
+            '📤 Staff $lrn has ${attendanceRecords.length} attendance records',
+          );
+
+          // Check if this person is a teacher or student in Firebase
+          final isTeacher = await FirebaseService.getTeacherByLrn(lrn) != null;
+          final collectionName = isTeacher ? 'teacher_logs' : 'student_logs';
+          log(
+            '📤 $lrn is a ${isTeacher ? 'TEACHER' : 'STUDENT'} -> uploading to $collectionName',
+          );
+
+          for (var record in attendanceRecords) {
+            try {
+              // Use LRN as document ID (will merge with existing records)
+              final docId = lrn;
+              log('📤 Uploading to collection: $collectionName, docId: $docId');
+
+              // Prepare attendance data for Firebase
+              final attendanceData = {
+                'fullName': fullName,
+                'lrn': lrn,
+                'date': record['date'],
+                'morningIn': record['time_in_morning'],
+                'morningOut': record['time_out_morning'],
+                'afternoonIn': record['time_in_afternoon'],
+                'afternoonOut': record['time_out_afternoon'],
+              };
+              log('📤 Attendance data: $attendanceData');
+
+              // Upload to Firebase - merge with existing data
+              await FirebaseFirestore.instance
+                  .collection(collectionName)
+                  .doc(docId)
+                  .set(attendanceData, SetOptions(merge: true));
+
+              uploaded++;
+              log('✅ Uploaded to $collectionName/$docId');
+            } catch (e, stackTrace) {
+              log('⚠️ Failed to upload attendance record: $e\n$stackTrace');
+            }
+          }
+        } catch (e, stackTrace) {
+          log('⚠️ Failed to sync attendance for staff: $e\n$stackTrace');
+        }
+      }
+
+      log('✅ Upload completed! $uploaded attendance records uploaded');
+
+      if (mounted) {
+        setState(() {
+          _lastUploadTime = DateTime.now();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Uploaded $uploaded attendance records'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      log('❌ Upload failed: $e\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Upload failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }

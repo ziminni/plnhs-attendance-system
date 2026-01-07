@@ -1,21 +1,19 @@
 import 'dart:developer';
 import 'dart:io';
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import '../services/firebase_service.dart';
+import '../services/local_db_service.dart';
 import '../models/models.dart';
 import 'result_page.dart';
 
-/// UI helper class for attendance type selection in scanner
 class AttendanceTypeItem {
   final String name;
   final IconData icon;
   final Color color;
   final AttendanceType type;
-
   AttendanceTypeItem(this.name, this.icon, this.color, this.type);
 }
 
@@ -77,30 +75,24 @@ class _QRViewExampleState extends State<QRViewExample>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
-
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(
           CurvedAnimation(parent: _slideController, curve: Curves.elasticOut),
         );
-
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
-
     _slideController.forward();
     _fadeController.forward();
   }
@@ -110,6 +102,7 @@ class _QRViewExampleState extends State<QRViewExample>
     _pulseController.dispose();
     _slideController.dispose();
     _fadeController.dispose();
+    controller?.dispose();
     super.dispose();
   }
 
@@ -122,15 +115,18 @@ class _QRViewExampleState extends State<QRViewExample>
     controller?.resumeCamera();
   }
 
-  void _toggleControls() {
-    setState(() {
-      _controlsVisible = !_controlsVisible;
-    });
-
-    if (_controlsVisible) {
-      _fadeController.forward();
-    } else {
-      _fadeController.reverse();
+  String _getSqliteField(AttendanceType type) {
+    switch (type) {
+      case AttendanceType.morningIn:
+        return 'time_in_morning';
+      case AttendanceType.morningOut:
+        return 'time_out_morning';
+      case AttendanceType.afternoonIn:
+        return 'time_in_afternoon';
+      case AttendanceType.afternoonOut:
+        return 'time_out_afternoon';
+      default:
+        return '';
     }
   }
 
@@ -142,10 +138,7 @@ class _QRViewExampleState extends State<QRViewExample>
         onDoubleTap: _toggleControls,
         child: Stack(
           children: [
-            // QR Scanner View - Full screen
             Positioned.fill(child: _buildQrView(context)),
-
-            // Top Controls - Animated
             if (_controlsVisible)
               AnimatedBuilder(
                 animation: _fadeAnimation,
@@ -172,12 +165,10 @@ class _QRViewExampleState extends State<QRViewExample>
                   );
                 },
               ),
-
-            // Scanning Indicator - Always visible in center
             Center(
               child: Container(
-                width: 230, // Fixed size
-                height: 230, // Fixed size
+                width: 230,
+                height: 230,
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: _isScanning ? Colors.green : Colors.red,
@@ -187,10 +178,7 @@ class _QRViewExampleState extends State<QRViewExample>
                 ),
                 child: Stack(
                   children: [
-                    // Corner decorations
                     ..._buildCornerDecorations(),
-
-                    // Center icon when not scanning
                     if (!_isScanning)
                       Center(
                         child: Container(
@@ -210,8 +198,6 @@ class _QRViewExampleState extends State<QRViewExample>
                 ),
               ),
             ),
-
-            // Bottom Controls - Animated
             if (_controlsVisible)
               AnimatedBuilder(
                 animation: _fadeAnimation,
@@ -398,7 +384,6 @@ class _QRViewExampleState extends State<QRViewExample>
                 ],
               ),
             ),
-
           Row(
             children: [
               Expanded(
@@ -472,7 +457,6 @@ class _QRViewExampleState extends State<QRViewExample>
 
   List<Widget> _buildCornerDecorations() {
     return [
-      // Top-left corner
       Positioned(
         top: 10,
         left: 10,
@@ -493,7 +477,6 @@ class _QRViewExampleState extends State<QRViewExample>
           ),
         ),
       ),
-      // Top-right corner
       Positioned(
         top: 10,
         right: 10,
@@ -514,7 +497,6 @@ class _QRViewExampleState extends State<QRViewExample>
           ),
         ),
       ),
-      // Bottom-left corner
       Positioned(
         bottom: 10,
         left: 10,
@@ -535,7 +517,6 @@ class _QRViewExampleState extends State<QRViewExample>
           ),
         ),
       ),
-      // Bottom-right corner
       Positioned(
         bottom: 10,
         right: 10,
@@ -560,8 +541,7 @@ class _QRViewExampleState extends State<QRViewExample>
   }
 
   Widget _buildQrView(BuildContext context) {
-    const scanArea = 320.0; // Fixed scan area size
-
+    const scanArea = 320.0;
     return QRView(
       key: qrKey,
       onQRViewCreated: _onQRViewCreated,
@@ -594,170 +574,267 @@ class _QRViewExampleState extends State<QRViewExample>
       log('No code detected');
       return;
     }
-
     String rawLrn = scanData.code!;
     String lrn = rawLrn.trim().replaceAll(RegExp(r'\s+'), '');
-    log('Raw Scanned LRN: $rawLrn');
-    log('Cleaned Scanned LRN: $lrn');
+    log('======== SCAN DEBUG ========');
+    log('Raw Scanned LRN: "$rawLrn"');
+    log('Cleaned Scanned LRN: "$lrn"');
+    log('LRN length: ${lrn.length}');
+    log('============================');
     await controller?.pauseCamera();
-
     try {
-      // Get the AttendanceType enum from selected string
       final attendanceType = AttendanceType.fromString(selectedAttendanceType);
       log('Processing attendance type: ${attendanceType.displayName}');
-
-      // Fetch user data (student or teacher)
       final userData = await _fetchUserData(lrn);
       if (userData == null) {
-        log('User not found for LRN: $lrn');
-        _showPopupAndAutoDismiss(
-          context,
-          false,
-          'Unknown User',
-          lrn,
-          'N/A',
-          attendanceType.displayName,
-          false,
-        );
+        log('❌ User not found for LRN: $lrn');
+        if (mounted) {
+          _showPopupAndAutoDismiss(
+            context,
+            false,
+            'Unknown User',
+            lrn,
+            'N/A',
+            attendanceType.displayName,
+            false,
+          );
+        }
         return;
       }
-
-      String label = userData['label']?.toString().toLowerCase() ?? '';
-      bool isDone = false;
-
-      if (label == 'student') {
-        DocumentSnapshot logDoc = await FirebaseFirestore.instance
-            .collection('student_logs')
-            .doc(lrn)
-            .get();
-        if (logDoc.exists) {
-          var data = logDoc.data() as Map<String, dynamic>?;
-          if (data != null) {
-            // Check if attendance already logged using the enum's firestoreField
-            isDone = data[attendanceType.firestoreField] != null;
-          }
-        }
-
-        if (!isDone) {
-          await FirebaseService.logAttendance(lrn, attendanceType);
-          log(
-            'Student attendance logged for LRN: $lrn, Type: ${attendanceType.displayName}',
-          );
-          String fullName =
-              '${userData['firstname'] ?? ''} ${userData['middlename'] ?? ''} ${userData['lastname'] ?? ''}'
-                  .trim();
-          String section = userData['grade_and_section'] ?? 'Unknown';
+      log(
+        '✅ User found: ${userData['fullname'] ?? userData['full_name'] ?? 'Unknown'}',
+      );
+      final dbService = LocalDbService();
+      final staffList = await dbService.getAllStaff();
+      // Direct comparison - both normalized to lowercase during sync
+      final dbUserList = staffList.where((s) => s['id_number'] == lrn).toList();
+      final dbUser = dbUserList.isEmpty ? null : dbUserList.first;
+      log('👤 Found DB user: $dbUser');
+      log('👤 Staff list size: ${staffList.length}');
+      log('👤 Searching for LRN: $lrn');
+      log('👤 DB User fullname field: ${dbUser?['fullname']}');
+      if (dbUser == null) {
+        log('User not found locally for LRN: $lrn');
+        if (mounted) {
           _showPopupAndAutoDismiss(
             context,
-            true,
-            fullName,
-            lrn,
-            section,
-            attendanceType.displayName,
             false,
-          );
-        } else {
-          _showPopupAndAutoDismiss(
-            context,
-            true,
-            'Already Done',
-            lrn,
-            'N/A',
-            attendanceType.displayName,
-            true,
-          );
-        }
-      } else if (label == 'teacher') {
-        DocumentSnapshot logDoc = await FirebaseFirestore.instance
-            .collection('teacher_logs')
-            .doc(lrn)
-            .get();
-        if (logDoc.exists) {
-          var data = logDoc.data() as Map<String, dynamic>?;
-          if (data != null) {
-            // Check if attendance already logged using the enum's firestoreField
-            isDone = data[attendanceType.firestoreField] != null;
-          }
-        }
-
-        if (!isDone) {
-          await FirebaseService.logTeacherAttendance(lrn, attendanceType);
-          log(
-            'Teacher attendance logged for LRN: $lrn, Type: ${attendanceType.displayName}',
-          );
-          String fullName = userData['fullname'] ?? 'Unknown';
-          _showPopupAndAutoDismiss(
-            context,
-            true,
-            fullName,
+            'Unknown User',
             lrn,
             'N/A',
             attendanceType.displayName,
             false,
           );
-        } else {
-          _showPopupAndAutoDismiss(
-            context,
-            true,
-            'Already Done',
-            lrn,
-            'N/A',
-            attendanceType.displayName,
-            true,
+        }
+        return;
+      }
+      final attendanceRecords = await dbService.getAttendanceByStaff(
+        dbUser['id'],
+      );
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      log('📅 Today date: $today');
+      log('📝 All records for staff: $attendanceRecords');
+      final todayRecordList = attendanceRecords
+          .where((a) => (a['date'] ?? '').toString().startsWith(today))
+          .toList();
+      log('📝 Today\'s records: $todayRecordList');
+      final todayRecord = todayRecordList.isEmpty
+          ? null
+          : todayRecordList.first;
+      String sqliteField = _getSqliteField(attendanceType);
+      log(
+        '🔍 Checking field "$sqliteField" in record: ${todayRecord?[sqliteField]}',
+      );
+      bool isDone = (todayRecord != null && todayRecord[sqliteField] != null);
+
+      if (!isDone) {
+        try {
+          if (todayRecord == null) {
+            // Insert new record
+            Map<String, dynamic> attendance = {
+              'staff_id': dbUser['id'],
+              'date': today,
+              sqliteField: DateTime.now().toIso8601String(),
+            };
+            log('📝 Inserting new attendance record: $attendance');
+            await dbService.insertAttendance(attendance);
+          } else {
+            // Update existing record - only update the specific field
+            Map<String, dynamic> updateData = {
+              sqliteField: DateTime.now().toIso8601String(),
+            };
+            log(
+              '📝 Updating existing attendance record (ID: ${todayRecord['id']}) with: $updateData',
+            );
+            await dbService.updateAttendance(todayRecord['id'], updateData);
+          }
+          log(
+            'Attendance logged locally for LRN: $lrn, Type: ${attendanceType.displayName}',
           );
+          log('👤 DB User full record: $dbUser');
+          String fullName = dbUser['fullname'] ?? 'Unknown';
+          String phone = dbUser['phone_number'] ?? 'N/A';
+          log('📝 Using fullName: "$fullName" and phone: "$phone"');
+          if (mounted) {
+            _showPopupAndAutoDismiss(
+              context,
+              true,
+              fullName,
+              lrn,
+              phone,
+              attendanceType.displayName,
+              false,
+            );
+          }
+        } catch (e, stackTrace) {
+          log('❌ Error saving attendance: $e');
+          log('❌ Stack trace: $stackTrace');
+          log('❌ Today record ID: ${todayRecord?['id']}');
+          log('❌ Today record data: $todayRecord');
+          log('❌ Update field: $sqliteField');
+          log('❌ DB User ID: ${dbUser['id']}');
+          if (mounted) {
+            _showPopupAndAutoDismiss(
+              context,
+              false,
+              'Error Saving',
+              lrn,
+              'DB: $e',
+              attendanceType.displayName,
+              false,
+            );
+          }
         }
       } else {
-        _showPopupAndAutoDismiss(
-          context,
-          false,
-          'Unknown User Type',
-          lrn,
-          'N/A',
-          attendanceType.displayName,
-          false,
-        );
+        if (mounted) {
+          _showPopupAndAutoDismiss(
+            context,
+            true,
+            'Already Done',
+            lrn,
+            'N/A',
+            attendanceType.displayName,
+            true,
+          );
+        }
       }
     } catch (e) {
       log('Error handling scan: $e');
-      _showPopupAndAutoDismiss(
-        context,
-        false,
-        'Error',
-        lrn,
-        'N/A',
-        selectedAttendanceType,
-        false,
-      );
+      if (mounted) {
+        _showPopupAndAutoDismiss(
+          context,
+          false,
+          'Error',
+          scanData.code ?? '',
+          'N/A',
+          selectedAttendanceType,
+          false,
+        );
+      }
     } finally {
       _resumeAndReset();
     }
   }
 
   Future<Map<String, dynamic>?> _fetchUserData(String lrn) async {
-    // Run both queries in parallel for faster lookup
-    final results = await Future.wait([
-      FirebaseService.getStudentByLrn(lrn),
-      FirebaseService.getTeacherByLrn(lrn),
-    ]);
+    log('🔍 _fetchUserData called with LRN: "$lrn"');
 
-    final student = results[0] as Student?;
-    final teacher = results[1] as Teacher?;
+    // Normalize the LRN (trim and lowercase for comparison)
+    final normalizedLrn = lrn.trim().toLowerCase();
 
-    if (student != null) {
-      log('Found student for LRN: $lrn');
-      final data = student.toMap();
-      data['label'] = 'student';
-      return data;
+    // First, try to get from local database (works offline)
+    final dbService = LocalDbService();
+    final staffList = await dbService.getAllStaff();
+    log('📱 Local DB staff count: ${staffList.length}');
+    if (staffList.isNotEmpty) {
+      log(
+        '📱 Sample local staff IDs: ${staffList.take(3).map((s) => '${s['id_number']}').toList()}',
+      );
     }
 
-    if (teacher != null) {
-      log('Found teacher for LRN: $lrn');
-      final data = teacher.toMap();
-      data['label'] = 'teacher';
-      return data;
+    // Try exact match first, then case-insensitive
+    var localStaff = staffList
+        .where(
+          (s) =>
+              (s['id_number']?.toString().trim().toLowerCase() ?? '') ==
+              normalizedLrn,
+        )
+        .toList();
+
+    if (localStaff.isNotEmpty) {
+      log(
+        '✅ Found staff in local DB for LRN: $lrn (matched: ${localStaff.first['id_number']})',
+      );
+      return localStaff.first;
     }
 
-    log('No data found for LRN: $lrn');
+    log('⚠️ No local match found. Checking Firebase...');
+
+    // If not found locally, try Firebase (requires internet)
+    try {
+      log('🌐 Querying Firebase for student and teacher...');
+      final results = await Future.wait([
+        FirebaseService.getStudentByLrn(lrn),
+        FirebaseService.getTeacherByLrn(lrn),
+      ]).timeout(const Duration(seconds: 5));
+
+      final student = results[0] as Student?;
+      final teacher = results[1] as Teacher?;
+
+      log(
+        '🌐 Firebase student result: ${student != null ? 'FOUND' : 'NOT FOUND'}',
+      );
+      log(
+        '🌐 Firebase teacher result: ${teacher != null ? 'FOUND' : 'NOT FOUND'}',
+      );
+
+      if (student != null) {
+        log('✅ Found student for LRN: $lrn');
+        // Insert student into local DB for future offline use
+        final staffData = {
+          'id_number': lrn.toLowerCase(),
+          'fullname': student.fullName,
+          'phone_number': student.guardianContact ?? 'N/A',
+        };
+        try {
+          final dbService = LocalDbService();
+          await dbService.insertOrUpdateStaff(staffData);
+          log('💾 Cached student to local DB');
+        } catch (e) {
+          log('⚠️ Failed to cache student: $e');
+        }
+        final data = student.toMap();
+        data['label'] = 'student';
+        data['fullname'] = student.fullName;
+        data['id_number'] = lrn.toLowerCase();
+        return data;
+      }
+      if (teacher != null) {
+        log('✅ Found teacher for LRN: $lrn');
+        // Insert teacher into local DB for future offline use
+        final staffData = {
+          'id_number': lrn.toLowerCase(),
+          'fullname': teacher.fullname,
+          'phone_number': teacher.emergencyContact ?? 'N/A',
+        };
+        try {
+          final dbService = LocalDbService();
+          await dbService.insertOrUpdateStaff(staffData);
+          log('💾 Cached teacher to local DB');
+        } catch (e) {
+          log('⚠️ Failed to cache teacher: $e');
+        }
+        final data = teacher.toMap();
+        data['label'] = 'teacher';
+        data['fullname'] = teacher.fullname;
+        data['id_number'] = lrn.toLowerCase();
+        return data;
+      }
+    } catch (e) {
+      log('❌ Firebase fetch failed (offline?): $e');
+    }
+
+    log('❌ No data found for LRN: $lrn');
     return null;
   }
 
@@ -787,12 +864,10 @@ class _QRViewExampleState extends State<QRViewExample>
           const begin = Offset(0.0, 1.0);
           const end = Offset.zero;
           const curve = Curves.easeInOutCubic;
-
           var tween = Tween(
             begin: begin,
             end: end,
           ).chain(CurveTween(curve: curve));
-
           return SlideTransition(
             position: animation.drive(tween),
             child: child,
@@ -803,9 +878,8 @@ class _QRViewExampleState extends State<QRViewExample>
     ).then((_) {
       _resumeAndReset();
     });
-
     Future.delayed(const Duration(seconds: 3), () {
-      if (Navigator.canPop(context)) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
     });
@@ -817,6 +891,289 @@ class _QRViewExampleState extends State<QRViewExample>
       result = null;
       _isScanning = true;
     });
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _controlsVisible = !_controlsVisible;
+    });
+    if (_controlsVisible) {
+      _fadeController.forward();
+    } else {
+      _fadeController.reverse();
+    }
+  }
+
+  Future<void> _syncStaffData() async {
+    log('🔄 Starting staff data sync from Firebase...');
+
+    // Check internet connection
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      if (result.isEmpty || result[0].rawAddress.isEmpty) {
+        throw const SocketException('No internet');
+      }
+    } on SocketException catch (_) {
+      log('❌ No internet connection');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ No internet connection available'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Syncing staff & student data...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final dbService = LocalDbService();
+      int synced = 0;
+
+      // Fetch all teachers from Firebase
+      try {
+        log('📥 Fetching teachers...');
+        final teachersSnapshot = await FirebaseFirestore.instance
+            .collection('teachers')
+            .get();
+        log('📥 Found ${teachersSnapshot.docs.length} teachers in Firebase');
+
+        for (var doc in teachersSnapshot.docs) {
+          try {
+            final teacherData = doc.data();
+            log('📥 Teacher raw data: $teacherData');
+            final lrn = (teacherData['lrn'] ?? doc.id)
+                .toString()
+                .trim()
+                .toLowerCase();
+
+            final fullName =
+                teacherData['fullName'] ??
+                teacherData['full_name'] ??
+                teacherData['name'] ??
+                teacherData['fullname'] ??
+                'Unknown';
+            log(
+              '📥 Extracted fullName: "$fullName" from keys: ${teacherData.keys}',
+            );
+
+            final staffData = {
+              'id_number': lrn,
+              'fullname': fullName,
+              'phone_number':
+                  teacherData['contactNumber'] ??
+                  teacherData['contact_number'] ??
+                  'N/A',
+            };
+
+            await dbService.insertOrUpdateStaff(staffData);
+            synced++;
+            log('✅ Synced teacher: $lrn - $fullName');
+          } catch (e, stackTrace) {
+            log('⚠️ Failed to sync teacher: $e\n$stackTrace');
+          }
+        }
+      } catch (e, stackTrace) {
+        log('❌ Error fetching teachers: $e\n$stackTrace');
+      }
+
+      // Fetch all students from Firebase
+      try {
+        log('📥 Fetching students...');
+        final studentsSnapshot = await FirebaseFirestore.instance
+            .collection('students')
+            .get();
+        log('📥 Found ${studentsSnapshot.docs.length} students in Firebase');
+
+        for (var doc in studentsSnapshot.docs) {
+          try {
+            final studentData = doc.data();
+            log('📥 Student raw data: $studentData');
+            final lrn = (studentData['lrn'] ?? doc.id)
+                .toString()
+                .trim()
+                .toLowerCase();
+
+            final fullName =
+                studentData['fullName'] ??
+                studentData['full_name'] ??
+                studentData['name'] ??
+                studentData['fullname'] ??
+                'Unknown';
+            log(
+              '📥 Extracted fullName: "$fullName" from keys: ${studentData.keys}',
+            );
+
+            final staffData = {
+              'id_number': lrn,
+              'fullname': fullName,
+              'phone_number':
+                  studentData['contactNumber'] ??
+                  studentData['contact_number'] ??
+                  'N/A',
+            };
+
+            await dbService.insertOrUpdateStaff(staffData);
+            synced++;
+            log('✅ Synced student: $lrn - $fullName');
+          } catch (e, stackTrace) {
+            log('⚠️ Failed to sync student: $e\n$stackTrace');
+          }
+        }
+      } catch (e, stackTrace) {
+        log('❌ Error fetching students: $e\n$stackTrace');
+      }
+
+      log('✅ Sync completed! $synced total records synced');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Synced $synced staff & students'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      log('❌ Sync failed: $e\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Sync failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncAttendanceToFirebase() async {
+    log('🔄 Starting attendance upload to Firebase...');
+
+    // Check internet connection
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      if (result.isEmpty || result[0].rawAddress.isEmpty) {
+        throw const SocketException('No internet');
+      }
+    } on SocketException catch (_) {
+      log('❌ No internet connection');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ No internet connection available'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Uploading attendance records...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final dbService = LocalDbService();
+      int uploaded = 0;
+
+      // Get all staff from local DB
+      final staffList = await dbService.getAllStaff();
+      log('📤 Found ${staffList.length} staff records to sync');
+
+      for (var staff in staffList) {
+        try {
+          final staffId = staff['id'];
+          final lrn = staff['id_number'];
+          final fullName = staff['fullname'];
+
+          // Get all attendance records for this staff
+          final attendanceRecords = await dbService.getAttendanceByStaff(
+            staffId,
+          );
+          log(
+            '📤 Staff $lrn has ${attendanceRecords.length} attendance records',
+          );
+
+          // Check if this person is a teacher or student in Firebase
+          final isTeacher = await FirebaseService.getTeacherByLrn(lrn) != null;
+          final collectionName = isTeacher ? 'teacher_logs' : 'student_logs';
+          log(
+            '📤 $lrn is a ${isTeacher ? 'TEACHER' : 'STUDENT'} -> uploading to $collectionName',
+          );
+
+          for (var record in attendanceRecords) {
+            try {
+              // Use LRN as document ID (will merge with existing records)
+              final docId = lrn;
+              log('📤 Uploading to collection: $collectionName, docId: $docId');
+
+              // Prepare attendance data for Firebase
+              final attendanceData = {
+                'fullName': fullName,
+                'lrn': lrn,
+                'date': record['date'],
+                'morningIn': record['time_in_morning'],
+                'morningOut': record['time_out_morning'],
+                'afternoonIn': record['time_in_afternoon'],
+                'afternoonOut': record['time_out_afternoon'],
+              };
+              log('📤 Attendance data: $attendanceData');
+
+              // Upload to Firebase - merge with existing data
+              await FirebaseFirestore.instance
+                  .collection(collectionName)
+                  .doc(docId)
+                  .set(attendanceData, SetOptions(merge: true));
+
+              uploaded++;
+              log('✅ Uploaded to $collectionName/$docId');
+            } catch (e, stackTrace) {
+              log('⚠️ Failed to upload attendance record: $e\n$stackTrace');
+            }
+          }
+        } catch (e, stackTrace) {
+          log('⚠️ Failed to sync attendance for staff: $e\n$stackTrace');
+        }
+      }
+
+      log('✅ Upload completed! $uploaded attendance records uploaded');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Uploaded $uploaded attendance records'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      log('❌ Upload failed: $e\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Upload failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   void _onPermissionSet(BuildContext context, QRViewController ctrl, bool p) {

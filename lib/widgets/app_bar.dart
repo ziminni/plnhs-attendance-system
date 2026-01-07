@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
-class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
+class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   final bool showMenuButton;
   final bool isDesktop;
   final Color primaryBlue;
@@ -17,7 +18,55 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => Size.fromHeight(isDesktop ? 100 : 80); // Reduced height for mobile
+  Size get preferredSize => Size.fromHeight(isDesktop ? 100 : 80);
+
+  @override
+  State<CustomAppBar> createState() => _CustomAppBarState();
+}
+
+class _CustomAppBarState extends State<CustomAppBar> {
+  bool _isOnline = false;
+  late Future<void> _checkFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInternetConnection();
+    // Check internet connection every 2 seconds continuously
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        await _checkInternetConnection();
+      }
+      return mounted;
+    });
+  }
+
+  Future<void> _checkInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+      final isOnline = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+      if (mounted) {
+        setState(() {
+          _isOnline = isOnline;
+        });
+      }
+    } on SocketException {
+      if (mounted) {
+        setState(() {
+          _isOnline = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isOnline = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,28 +75,28 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [primaryBlue, darkBlue, accentBlue],
+          colors: [widget.primaryBlue, widget.darkBlue, widget.accentBlue],
           stops: const [0.0, 0.7, 1.0],
         ),
         boxShadow: [
           BoxShadow(
-            color: primaryBlue.withOpacity(0.3),
+            color: widget.primaryBlue.withOpacity(0.3),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
       ),
       child: SafeArea(
-        top: !isDesktop, // Avoid top SafeArea in immersive mode for mobile/tablet
+        top: !widget.isDesktop,
         bottom: false,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 24.0 : 16.0, // Reduced padding for mobile
-            vertical: isDesktop ? 12.0 : 8.0,
+            horizontal: widget.isDesktop ? 24.0 : 16.0,
+            vertical: widget.isDesktop ? 12.0 : 8.0,
           ),
           child: Row(
             children: [
-              if (showMenuButton)
+              if (widget.showMenuButton)
                 Builder(
                   builder: (context) => Container(
                     margin: const EdgeInsets.only(right: 16),
@@ -77,10 +126,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 ),
               Container(
-                padding: EdgeInsets.all(isDesktop ? 16 : 10), // Smaller padding for mobile
+                padding: EdgeInsets.all(
+                  widget.isDesktop ? 16 : 10,
+                ), // Smaller padding for mobile
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(isDesktop ? 20 : 12),
+                  borderRadius: BorderRadius.circular(
+                    widget.isDesktop ? 20 : 12,
+                  ),
                   border: Border.all(
                     color: Colors.white.withOpacity(0.3),
                     width: 1,
@@ -89,7 +142,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Icon(
                   Icons.child_care,
                   color: Colors.white,
-                  size: isDesktop ? 36 : 28, // Smaller icon for mobile
+                  size: widget.isDesktop ? 36 : 28, // Smaller icon for mobile
                 ),
               ),
               const SizedBox(width: 16),
@@ -105,19 +158,23 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       child: Text(
                         "E.A.R.L.Y",
                         style: TextStyle(
-                          fontSize: isDesktop ? 36 : 28, // Smaller font for mobile
+                          fontSize: widget.isDesktop
+                              ? 36
+                              : 28, // Smaller font for mobile
                           fontWeight: FontWeight.w800,
-                          letterSpacing: isDesktop ? 3.0 : 2.0,
+                          letterSpacing: widget.isDesktop ? 3.0 : 2.0,
                           color: Colors.white,
                         ),
                       ),
                     ),
                     Text(
-                      isDesktop
+                      widget.isDesktop
                           ? "Early Assessment & Recognition Learning Yard - Desktop Platform"
                           : "Early Assessment & Recognition",
                       style: TextStyle(
-                        fontSize: isDesktop ? 16 : 12, // Smaller font for mobile
+                        fontSize: widget.isDesktop
+                            ? 16
+                            : 12, // Smaller font for mobile
                         fontWeight: FontWeight.w400,
                         color: Colors.white.withOpacity(0.9),
                         letterSpacing: 0.5,
@@ -126,11 +183,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-              if (isDesktop)
+              if (widget.isDesktop)
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -180,12 +240,19 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: _isOnline
+                        ? Colors.green.withOpacity(0.2)
+                        : Colors.grey.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
+                      color: _isOnline
+                          ? Colors.green.withOpacity(0.5)
+                          : Colors.grey.withOpacity(0.5),
                       width: 1,
                     ),
                   ),
@@ -193,16 +260,20 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.phone_android,
-                        color: Colors.white.withOpacity(0.8),
-                        size: 14, // Smaller icon for mobile
+                        _isOnline ? Icons.wifi : Icons.wifi_off,
+                        color: _isOnline
+                            ? Colors.green.withOpacity(0.9)
+                            : Colors.grey.withOpacity(0.8),
+                        size: 14,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        "Mobile",
+                        _isOnline ? "Online" : "Offline",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 10, // Smaller font for mobile
+                          color: _isOnline
+                              ? Colors.green.withOpacity(0.9)
+                              : Colors.grey.withOpacity(0.9),
+                          fontSize: 10,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

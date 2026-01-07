@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
+import '../services/local_db_service.dart';
 import '../models/models.dart';
 
 class HomePage extends StatefulWidget {
@@ -66,11 +67,81 @@ class _HomePageState extends State<HomePage>
       // Get today's date for logs
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      // Get today's logs
-      final studentLogs = await FirebaseService.getStudentLogsByDate(today);
-      final teacherLogs = await FirebaseService.getTeacherLogsByDate(today);
+      // Get all staff with their attendance from local database
+      final localDbService = LocalDbService();
+      final staffWithAttendance = await localDbService
+          .getStaffWithAttendanceByDate(today);
 
-      // Sort by most recent (we'll use the latest timestamp available)
+      // Build StudentLog and TeacherLog objects from local database
+      final studentLogs = <StudentLog>[];
+      final teacherLogs = <TeacherLog>[];
+
+      for (final record in staffWithAttendance) {
+        // Skip records with no attendance data
+        if (record['time_in_morning'] == null &&
+            record['time_in_afternoon'] == null) {
+          continue;
+        }
+
+        final fullName = record['fullname'] ?? 'Unknown';
+        final lrn = record['id_number'] ?? '';
+
+        // Parse datetime fields
+        DateTime? morningIn;
+        DateTime? morningOut;
+        DateTime? afternoonIn;
+        DateTime? afternoonOut;
+
+        if (record['time_in_morning'] != null) {
+          morningIn = DateTime.parse(record['time_in_morning']);
+        }
+        if (record['time_out_morning'] != null) {
+          morningOut = DateTime.parse(record['time_out_morning']);
+        }
+        if (record['time_in_afternoon'] != null) {
+          afternoonIn = DateTime.parse(record['time_in_afternoon']);
+        }
+        if (record['time_out_afternoon'] != null) {
+          afternoonOut = DateTime.parse(record['time_out_afternoon']);
+        }
+
+        // Query Firebase to determine if user is teacher or student
+        final isStudent = await FirebaseService.getStudentByLrn(lrn) != null;
+        final isTeacher = await FirebaseService.getTeacherByLrn(lrn) != null;
+
+        if (isStudent) {
+          studentLogs.add(
+            StudentLog(
+              lrn: lrn,
+              fullName: fullName,
+              yearAndSection: 'Unknown',
+              address: 'Unknown',
+              emergencyContact: 'Unknown',
+              date: today,
+              morningIn: morningIn,
+              morningOut: morningOut,
+              afternoonIn: afternoonIn,
+              afternoonOut: afternoonOut,
+            ),
+          );
+        } else if (isTeacher) {
+          teacherLogs.add(
+            TeacherLog(
+              lrn: lrn,
+              fullName: fullName,
+              address: 'Unknown',
+              emergencyContact: 'Unknown',
+              date: today,
+              morningIn: morningIn,
+              morningOut: morningOut,
+              afternoonIn: afternoonIn,
+              afternoonOut: afternoonOut,
+            ),
+          );
+        }
+      }
+
+      // Sort by most recent (latest timestamp)
       studentLogs.sort((a, b) {
         final aTime =
             a.afternoonOut ?? a.afternoonIn ?? a.morningOut ?? a.morningIn;
@@ -101,8 +172,12 @@ class _HomePageState extends State<HomePage>
         _filteredTeacherLogs = teacherLogs;
         _isLoading = false;
       });
+
+      print(
+        '✅ Loaded ${studentLogs.length} students and ${teacherLogs.length} teachers from local database',
+      );
     } catch (e) {
-      print('Error loading home data: $e');
+      print('❌ Error loading home data: $e');
       setState(() => _isLoading = false);
     }
   }
