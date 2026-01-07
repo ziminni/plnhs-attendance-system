@@ -3,9 +3,13 @@ import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 
+// Add conditional import at the top of the file
+import 'excel_export_service_stub.dart'
+    if (dart.library.html) 'excel_export_service_web.dart';
+
 // For web download
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+// import 'dart:html' as html; // This line will be conditionally imported
 
 class ExcelExportService {
   /// Export student logs to Excel
@@ -231,13 +235,7 @@ class ExcelExportService {
 
   /// Download Excel file (web)
   static Future<void> _downloadExcel(Excel excel, String filename) async {
-    final bytes = excel.save();
-    if (bytes != null) {
-      final blob = html.Blob([
-        Uint8List.fromList(bytes),
-      ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.Url.revokeObjectUrl(url);
-    }
+    // This will be replaced by platform-specific implementation
+    throw UnimplementedError('Excel download is only implemented for web.');
   }
 }
